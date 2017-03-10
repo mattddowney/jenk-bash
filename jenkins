@@ -303,10 +303,10 @@ help() {
 			    job_name        Name of the job to be created
 
 			    project_url     Browser link of project repository
-				                    (IE: https://github.com/mattddowney/gogs-bash)
+				                    (IE: https://github.com/mattddowney/jenkins-bash)
 
 			    git_url         Git url of project
-				                    (IE: https://github.com/mattddowney/gogs-bash.git)
+				                    (IE: https://github.com/mattddowney/jenkins-bash.git)
 			END
 			;;
 
