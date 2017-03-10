@@ -1,0 +1,363 @@
+#!/bin/bash
+# Interact wih the Jenkins API
+
+action=${1:-"help"}
+
+# preseed for checks
+response_code=0
+
+# ensure JENKINS_ROOT_URL is set
+if [ -z $JENKINS_ROOT_URL ]
+then
+	printf "Need to set JENKINS_ROOT_URL environment variable (IE: http://localhost:8080)\n" >&2
+
+	response_code=1
+fi
+
+# ensure JENKINS_USER_NAME is set
+if [ -z $JENKINS_USER_NAME ]
+then
+	printf "Need to set JENKINS_USER_NAME environment variable\n" >&2
+
+	response_code=1
+fi
+
+# ensure JENKINS_TOKEN is set
+if [ -z $JENKINS_TOKEN ]
+then
+	printf "Need to set JENKINS_TOKEN environment variable ($JENKINS_ROOT_URL/me/configure)\n" >&2
+
+	response_code=1
+fi
+
+# exit if either of the environment variables above are not set
+if [ $response_code -ne 0 ]
+then
+	exit $response_code
+fi
+
+# abort an input action for a build awaiting input
+abort-input() {
+	local job_name=$1
+	local build_number=$2
+	local input_id=$3
+
+	# ensure job_name is passed in
+	if [ -z $job_name ]
+	then
+		response_code=1
+	fi
+
+	# ensure build_number is passed in
+	if [ -z $build_number ]
+	then
+		build_number=1
+	fi
+
+	# ensure input_id is passed in
+	if [ -z $input_id ]
+	then
+		input_id=1
+	fi
+
+	# print help and exit if either of the variables above are not passed in
+	if [ $response_code -ne 0 ]
+	then
+		help "abort-input"
+
+		exit $response_code
+	fi
+
+	printf "--" "Aborting input $input_id for build $build_number on job $job_name\n"
+
+	# capitalize the first letter of the input_id to make it pascal case
+	input_id="$(tr '[:lower:]' '[:upper:]' <<< ${input_id:0:1})${input_id:1}"
+
+	local crumb=$(get_crumb)
+
+	curl -X POST \
+		 -H "$crumb" \
+		 -u $JENKINS_USER_NAME:$JENKINS_TOKEN \
+		 -v "$JENKINS_ROOT_URL/job/$job_name/$build_number/input/$input_id/abort"
+}
+
+# copy an existing job and create a new one
+copy-job() {
+	local from_job_name=$1
+	local new_job_name=$2
+
+	# ensure from_job_name is passed in
+	if [ -z $from_job_name ]
+	then
+		response_code=1
+	fi
+
+	# ensure new_job_name is passed in
+	if [ -z $new_job_name ]
+	then
+		response_code=1
+	fi
+
+	# print help and exit if either of the variables above are not passed in
+	if [ $response_code -ne 0 ]
+	then
+		help "copy-job"
+
+		exit $response_code
+	fi
+
+	printf "--" "---> Copying job $from_job_name to new job $new_job_name on Jenkins server at $JENKINS_ROOT_URL\n"
+
+	local crumb=$(get_crumb)
+
+	curl -X POST \
+		 -H "$crumb" \
+		 -H "Content-Type: application/xml" \
+		 -u $JENKINS_USER_NAME:$JENKINS_TOKEN \
+		 -v "$JENKINS_ROOT_URL/createItem?name=$new_job_name&mode=copy&from=$from_job_name"
+}
+
+# create a jenkins job
+create-job() {
+	local job_name=$1
+	local project_url=$2
+	local git_url=$3
+
+	# ensure job_name is passed in
+	if [ -z $job_name ]
+	then
+		response_code=1
+	fi
+
+	# ensure project_url is passed in
+	if [ -z $project_url ]
+	then
+		response_code=1
+	fi
+
+	# ensure git_url is passed in
+	if [ -z $git_url ]
+	then
+		response_code=1
+	fi
+
+	# print help and exit if either of the variables above are not passed in
+	if [ $response_code -ne 0 ]
+	then
+		help "create-job"
+
+		exit $response_code
+	fi
+
+	printf "--" "---> Creating job $job_name on Jenkins server at $JENKINS_ROOT_URL\n"
+
+	local crumb=$(get_crumb)
+
+	local body=$(cat <<-END
+		<flow-definition plugin="workflow-job@2.9">
+			<keepDependencies>false</keepDependencies>
+			<properties>
+				<com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.25.1">
+					<projectUrl>$project_url</projectUrl>
+				</com.coravy.hudson.plugins.github.GithubProjectProperty>
+			</properties>
+			<definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps@2.25">
+				<scm class="hudson.plugins.git.GitSCM" plugin="git@3.0.1">
+					<configVersion>2</configVersion>
+					<userRemoteConfigs>
+						<hudson.plugins.git.UserRemoteConfig>
+							<url>$git_url</url>
+						</hudson.plugins.git.UserRemoteConfig>
+					</userRemoteConfigs>
+					<branches>
+						<hudson.plugins.git.BranchSpec>
+							<name>*/master</name>
+						</hudson.plugins.git.BranchSpec>
+					</branches>
+					<doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+					<submoduleCfg class="list"/>
+					<extensions>
+						<hudson.plugins.git.extensions.impl.SubmoduleOption>
+							<disableSubmodules>false</disableSubmodules>
+							<recursiveSubmodules>true</recursiveSubmodules>
+							<trackingSubmodules>false</trackingSubmodules>
+							<parentCredentials>false</parentCredentials>
+						</hudson.plugins.git.extensions.impl.SubmoduleOption>
+					</extensions>
+				</scm>
+				<scriptPath>Jenkinsfile</scriptPath>
+			</definition>
+		</flow-definition>
+	END
+	)
+
+	curl -H "$crumb" \
+		 -H "Content-Type: application/xml" \
+		 -u $JENKINS_USER_NAME:$JENKINS_TOKEN \
+		 -d "$body" \
+		 -v $JENKINS_ROOT_URL/createItem?name=$job_name
+}
+
+# trigger an input action for a build awaiting input
+trigger-input() {
+	local job_name=$1
+	local build_number=$2
+	local input_id=$3
+
+	# ensure job_name is passed in
+	if [ -z $job_name ]
+	then
+		response_code=1
+	fi
+
+	# ensure build_number is passed in
+	if [ -z $build_number ]
+	then
+		response_code=1
+	fi
+
+	# ensure input_id is passed in
+	if [ -z $input_id ]
+	then
+		response_code=1
+	fi
+
+	# print help and exit if either of the variables above are not passed in
+	if [ $response_code -ne 0 ]
+	then
+		help "trigger-input"
+
+		exit $response_code
+	fi
+
+	printf "--" "---> Triggering input $input_id for build $build_number on job $job_name\n"
+
+	# capitalize the first letter of the input_id to make it pascal case
+	input_id="$(tr '[:lower:]' '[:upper:]' <<< ${input_id:0:1})${input_id:1}"
+
+	local crumb=$(get_crumb)
+	
+	curl -H "$crumb" \
+		 -u $JENKINS_USER_NAME:$JENKINS_TOKEN \
+		 -d json='{"parameter": []}' \
+		 -v "$JENKINS_ROOT_URL/job/$job_name/$build_number/wfapi/inputSubmit?inputId=$input_id"
+}
+
+env() {
+	printf "JENKINS_ROOT_URL=$JENKINS_ROOT_URL\n"
+	printf "JENKINS_USER_NAME=$JENKINS_USER_NAME\n"
+	printf "JENKINS_TOKEN=$JENKINS_TOKEN\n"
+}
+
+# get a crumb
+# needed for most jenkins requests
+# https://wiki.jenkins-ci.org/display/JENKINS/CSRF+Protection
+get_crumb() {
+	local crumb=$(curl -u $JENKINS_USER_NAME:$JENKINS_TOKEN -s $JENKINS_ROOT_URL/crumbIssuer/api/json | jq --raw-output '.crumbRequestField + ": " + .crumb')
+
+	echo $crumb
+}
+
+help() {
+	local prog_name=$(echo "$0" | rev | cut -d'/' -f1 | rev)
+	local topic=$1
+
+	case "$topic" in
+		abort-input)
+			cat <<-END
+			Aborts a pipeline input.
+			
+			Arguments:
+				
+			    job_name        name of the job where the input resides
+			    build_number    the build number of the build awaiting input
+			    input_id        the id of the input, specified in the Jenkinsfile
+			END
+			;;
+
+		copy-job)
+			cat <<-END
+			Copy a Jenkins job.
+
+			Usage:
+
+			    $prog_name $1 <from_job_name> <new_job_name>
+
+			Arguments:
+
+			    from_job_name   Name of the job to copy
+			    new_job_name    Name of the new job to be created
+			END
+			;;
+
+		create-job)
+			cat <<-END
+			Create a Jenkins job.
+
+			Usage:
+
+			    $prog_name $1 <job_name> <project_url> <git_url>
+
+			Arguments:
+
+			    job_name        Name of the job to be created
+
+			    project_url     Browser link of project repository
+				                    (IE: https://github.com/mattddowney/gogs-bash)
+
+			    git_url         Git url of project
+				                    (IE: https://github.com/mattddowney/gogs-bash.git)
+			END
+			;;
+
+		env)
+			cat <<-END
+			Prints environment variables needed by this script.
+
+			Variables:
+
+			    JENKINS_ROOT_URL    The url of the Jenkins server
+				                        (IE: http://jenkins:8080)
+
+			    JENKINS_USER_NAME   Valid Jenkins API user
+
+			    JENKINS_TOKEN       API token for the above user
+				                        (Obtained from $JENKINS_ROOT_URL/user/settings/applications)
+			END
+			;;
+
+		trigger-input)
+			cat <<-END
+			Triggers a pipeline input.
+
+			Arguments:
+				
+			    job_name        name of the job where the input resides
+			    build_number    the build number of the build awaiting input
+			    input_id        the id of the input, specified in the Jenkinsfile
+			END
+			;;
+
+		*)
+			cat <<-END
+			$prog_name is a tool for interacting with the Jenkins API.
+
+			Usage:
+			
+			    $prog_name command [arguments]
+
+			The commands are:
+
+			    abort-input     abort a pipeline input
+			    copy-job	    copy a job from another
+			    create-job      create a job
+			    env             print environment information
+			    trigger-input   trigger a pipeline input
+
+			Use "$prog_name help [command]" for more information about a command.
+			END
+			;;
+	esac
+}
+
+"$action" "${@:2}"
