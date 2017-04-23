@@ -28,7 +28,7 @@ Usage:
 The commands are:
 
 	abort-input     abort a pipeline input
-	copy-job	    copy a job from another
+	copy-job        copy a job from another
 	create-job      create a job
 	env             print environment information
 	trigger-input   trigger a pipeline input
