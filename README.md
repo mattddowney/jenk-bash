@@ -1,5 +1,5 @@
-bash-jenkins
-============
+jenk
+====
 
 Interact with the [Jenkins](https://jenkins.io/) API from bash.
 
@@ -18,12 +18,12 @@ Usage:
 ------
 
 ```
-$ ./bash-jenkins
-./bash-jenkins is a tool for interacting with the Jenkins API.
+$ ./jenk
+./jenk is a tool for interacting with the Jenkins API.
 
 Usage:
 
-	./bash-jenkins command [arguments]
+	./jenk command [arguments]
 
 The commands are:
 
@@ -33,5 +33,5 @@ The commands are:
 	env             print environment information
 	trigger-input   trigger a pipeline input
 
-Use "./bash-jenkins help [command]" for more information about a command.
+Use "./jenk help [command]" for more information about a command.
 ```
