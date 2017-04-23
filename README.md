@@ -18,12 +18,12 @@ Usage:
 ------
 
 ```
-$ ./jenkins
-./jenkins is a tool for interacting with the Jenkins API.
+$ ./bash-jenkins
+./bash-jenkins is a tool for interacting with the Jenkins API.
 
 Usage:
 
-	./jenkins command [arguments]
+	./bash-jenkins command [arguments]
 
 The commands are:
 
@@ -33,5 +33,5 @@ The commands are:
 	env             print environment information
 	trigger-input   trigger a pipeline input
 
-Use "./jenkins help [command]" for more information about a command.
+Use "./bash-jenkins help [command]" for more information about a command.
 ```
