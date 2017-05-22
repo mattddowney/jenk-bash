@@ -1,5 +1,7 @@
-jenk
-====
+jenk-bash
+=========
+
+There is a newer version of this software written in go [here](https://github.com/mattddowney/jenk)
 
 Interact with the [Jenkins](https://jenkins.io/) API from bash.
 
