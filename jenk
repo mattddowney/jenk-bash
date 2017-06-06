@@ -322,7 +322,7 @@ help() {
 			    JENKINS_USER_NAME   Valid Jenkins API user
 
 			    JENKINS_TOKEN       API token for the above user
-				                        (Obtained from $JENKINS_ROOT_URL/user/settings/applications)
+				                        (Obtained from $JENKINS_ROOT_URL/me/configure)
 			END
 			;;
 
